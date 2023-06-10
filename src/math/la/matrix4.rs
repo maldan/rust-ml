@@ -1,3 +1,4 @@
+use crate::math::la::vector3::Vector3;
 use std::fmt;
 use std::ops;
 
@@ -201,6 +202,19 @@ impl Matrix4x4 {
         let a22 = self.raw[10];
         let a23 = self.raw[11];
 
+        self.raw[0] = a00;
+        self.raw[1] = a01;
+        self.raw[2] = a02;
+        self.raw[3] = a03;
+        self.raw[4] = a10;
+        self.raw[5] = a11;
+        self.raw[6] = a12;
+        self.raw[7] = a13;
+        self.raw[8] = a20;
+        self.raw[9] = a21;
+        self.raw[10] = a22;
+        self.raw[11] = a23;
+
         self.raw[12] = a00 * x + a10 * y + a20 * z + self.raw[12];
         self.raw[13] = a01 * x + a11 * y + a21 * z + self.raw[13];
         self.raw[14] = a02 * x + a12 * y + a22 * z + self.raw[14];
@@ -317,5 +331,13 @@ impl Matrix4x4 {
         let nf = 1.0 / (near - far);
         self.raw[10] = (far + near) * nf;
         self.raw[14] = 2.0 * far * near * nf;
+    }
+
+    pub fn get_position(&self) -> Vector3 {
+        Vector3 {
+            x: self.raw[12],
+            y: self.raw[13],
+            z: self.raw[14],
+        }
     }
 }

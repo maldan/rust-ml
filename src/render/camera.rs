@@ -38,7 +38,7 @@ impl PerspectiveCamera {
         self.matrix.rotate_z(self.rotation.z);
         self.matrix.translate(pos.x, pos.y, pos.z);
 
-        // Set final matrrx
+        // Set final matrix
         self.matrix = proj * self.matrix;
     }
 }

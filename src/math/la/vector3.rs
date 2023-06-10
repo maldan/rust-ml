@@ -76,21 +76,17 @@ impl ops::Mul<Matrix4x4> for Vector3 {
 }
 impl ops::MulAssign<Matrix4x4> for Vector3 {
     fn mul_assign(&mut self, mx: Matrix4x4) {
-        let mut v = Vector3::default();
+        let x = self.x;
+        let y = self.y;
+        let z = self.z;
 
-        let mut w = mx.raw[3] * self.x + mx.raw[7] * self.y + mx.raw[11] * self.z + mx.raw[15];
+        let mut w = mx.raw[3] * x + mx.raw[7] * y + mx.raw[11] * z + mx.raw[15];
         if w == 0.0 {
             w = 1.0;
         }
-        v.x = (mx.raw[0] * self.x + mx.raw[4] * self.y + mx.raw[8] * self.z + mx.raw[12]) / w;
-        v.y = (mx.raw[1] * self.x + mx.raw[5] * self.y + mx.raw[9] * self.z + mx.raw[13]) / w;
-        v.z = (mx.raw[2] * self.x + mx.raw[6] * self.y + mx.raw[10] * self.z + mx.raw[14]) / w;
-
-        *self = Self {
-            x: v.x,
-            y: v.y,
-            z: v.z,
-        }
+        self.x = (mx.raw[0] * x + mx.raw[4] * y + mx.raw[8] * z + mx.raw[12]) / w;
+        self.y = (mx.raw[1] * x + mx.raw[5] * y + mx.raw[9] * z + mx.raw[13]) / w;
+        self.z = (mx.raw[2] * x + mx.raw[6] * y + mx.raw[10] * z + mx.raw[14]) / w;
     }
 }
 
