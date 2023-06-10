@@ -33,6 +33,9 @@ impl PerspectiveCamera {
         self.matrix.identity();
         let pos = self.position.scale(-1.0);
 
+        self.matrix.rotate_x(self.rotation.x);
+        self.matrix.rotate_y(self.rotation.y);
+        self.matrix.rotate_z(self.rotation.z);
         self.matrix.translate(pos.x, pos.y, pos.z);
 
         // Set final matrrx
