@@ -5,6 +5,8 @@ use crate::math::la::vector3::Vector3;
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct Bone {
+    pub name: String,
+    pub index: u32,
     pub position: Vector3,
     pub rotation: Quaternion,
     pub scale: Vector3,
@@ -15,6 +17,8 @@ pub struct Bone {
 impl Bone {
     pub const fn new() -> Bone {
         Bone {
+            name: String::new(),
+            index: 0,
             position: Vector3::zero(),
             rotation: Quaternion::new(),
             scale: Vector3::one(),
@@ -29,12 +33,7 @@ impl Bone {
 
         self.matrix
             .translate(self.position.x, self.position.y, self.position.z);
-
-        let e = self.rotation.to_euler();
-        self.matrix.rotate_x(e.x);
-        self.matrix.rotate_y(e.y);
-        self.matrix.rotate_z(e.z);
-
+        self.matrix.rotate_quaternion(self.rotation);
         self.matrix.scale(self.scale.x, self.scale.y, self.scale.z);
 
         for i in 0..self.children.len() {

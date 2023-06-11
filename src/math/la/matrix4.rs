@@ -1,3 +1,4 @@
+use crate::math::la::quaternion::Quaternion;
 use crate::math::la::vector3::Vector3;
 use std::fmt;
 use std::ops;
@@ -281,6 +282,13 @@ impl Matrix4x4 {
         self.raw[13] = a01 * x + a11 * y + a21 * z + self.raw[13];
         self.raw[14] = a02 * x + a12 * y + a22 * z + self.raw[14];
         self.raw[15] = a03 * x + a13 * y + a23 * z + self.raw[15];
+    }
+
+    pub fn rotate_quaternion(&mut self, q: Quaternion) {
+        let e = q.to_euler();
+        self.rotate_x(e.x);
+        self.rotate_y(e.y);
+        self.rotate_z(e.z);
     }
 
     pub fn rotate_x(&mut self, rad: f32) {

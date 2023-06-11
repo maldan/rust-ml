@@ -4,6 +4,9 @@ use crate::math::la::vector2::Vector2;
 use crate::math::la::vector3::Vector3;
 use crate::math::la::vector4::Vector4;
 use crate::math::number;
+use crate::render::mesh::bone::Bone;
+use std::collections::HashMap;
+use std::ops::Deref;
 
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -14,18 +17,9 @@ pub struct MeshData {
     pub normal: Vec<Vector3>,
     pub uv0: Vec<Vector2>,
     pub color0: Vec<Vector3>,
-}
-
-#[derive(Clone, Debug)]
-#[repr(C)]
-pub struct SkinnedMeshData {
-    pub id: u32,
-    pub vertex: Vec<Vector3>,
-    pub index: Vec<u32>,
-    pub normal: Vec<Vector3>,
-    pub uv0: Vec<Vector2>,
-    pub weight: Vec<Vector4>,
+    pub bone_weight: Vec<Vector4>,
     pub bone_index: Vec<ColorRGBA>,
+    pub bone_list: Vec<Bone>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -46,6 +40,9 @@ impl MeshData {
             normal: vec![],
             uv0: vec![],
             color0: vec![],
+            bone_weight: vec![],
+            bone_index: vec![],
+            bone_list: vec![],
         }
     }
 
@@ -109,21 +106,32 @@ impl MeshData {
     pub fn from_mm2_bytes(bytes: &[u8]) -> MeshData {
         let mut mesh = MeshData::new();
         let mut offset = 0;
+        let mut bone_map: HashMap<String, Box<Bone>> = HashMap::new();
 
-        fn sex(b: &[u8], mut offset: usize, ident: usize) -> usize {
+        fn parse_hierarchy(
+            b: &[u8],
+            mut offset: usize,
+            ident: usize,
+            bm: &mut HashMap<String, Box<Bone>>,
+        ) -> (usize, Box<Bone>) {
             // Read bone name
             let l = b[offset];
             offset += 1;
             let name = std::str::from_utf8(&b[offset..offset + l as usize]).unwrap();
             offset += l as usize;
-            log::info!("H Bone {} {}", "-".repeat(ident), name);
+            // log::info!("H Bone {} {}", "-".repeat(ident), name);
+
+            let mut current_bone = bm.get(name).unwrap().clone();
+
             // Childs
             let amount = b[offset];
             offset += 1;
-            for i in 0..amount {
-                offset = sex(&b, offset, ident + 2);
+            for _ in 0..amount {
+                let r = parse_hierarchy(b, offset, ident + 2, bm);
+                offset = r.0;
+                current_bone.children.push(*r.1);
             }
-            return offset;
+            (offset, current_bone)
         }
 
         loop {
@@ -167,10 +175,20 @@ impl MeshData {
                         let rotation = Quaternion::from_bytes(&bytes[offset..offset + 4 * 4]);
                         offset += 4 * 4;
                         log::info!("Rotation {}", rotation);
+
+                        // Add bone
+                        let mut bone = Bone::new();
+                        bone.name = String::from(name);
+                        bone.position = position;
+                        bone.rotation = rotation;
+                        bone_map.insert(String::from(name), Box::new(bone));
                     }
 
                     // Read hierarchy
-                    offset = sex(bytes, offset, 0);
+                    let r = parse_hierarchy(bytes, offset, 0, &mut bone_map);
+                    offset = r.0;
+
+                    mesh.bone_list.push(*r.1);
                 }
                 _ => {
                     offset += size as usize;
