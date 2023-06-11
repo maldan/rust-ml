@@ -2,7 +2,7 @@ use crate::math::la::vector3::Vector3;
 use std::fmt;
 use std::ops;
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Matrix4x4 {
     pub raw: [f32; 16],
 }
@@ -93,6 +93,68 @@ impl ops::Mul<Matrix4x4> for Matrix4x4 {
         mx.raw[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
 
         mx
+    }
+}
+
+impl ops::MulAssign<Matrix4x4> for Matrix4x4 {
+    fn mul_assign(&mut self, b: Matrix4x4) {
+        let mut mx = Matrix4x4::default();
+
+        let a00 = self.raw[0];
+        let a01 = self.raw[1];
+        let a02 = self.raw[2];
+        let a03 = self.raw[3];
+        let a10 = self.raw[4];
+        let a11 = self.raw[5];
+        let a12 = self.raw[6];
+        let a13 = self.raw[7];
+        let a20 = self.raw[8];
+        let a21 = self.raw[9];
+        let a22 = self.raw[10];
+        let a23 = self.raw[11];
+        let a30 = self.raw[12];
+        let a31 = self.raw[13];
+        let a32 = self.raw[14];
+        let a33 = self.raw[15];
+
+        // Cache only the current line of the second matrix
+        let mut b0 = b.raw[0];
+        let mut b1 = b.raw[1];
+        let mut b2 = b.raw[2];
+        let mut b3 = b.raw[3];
+        mx.raw[0] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        mx.raw[1] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        mx.raw[2] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        mx.raw[3] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b.raw[4];
+        b1 = b.raw[5];
+        b2 = b.raw[6];
+        b3 = b.raw[7];
+        mx.raw[4] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        mx.raw[5] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        mx.raw[6] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        mx.raw[7] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b.raw[8];
+        b1 = b.raw[9];
+        b2 = b.raw[10];
+        b3 = b.raw[11];
+        mx.raw[8] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        mx.raw[9] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        mx.raw[10] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        mx.raw[11] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b.raw[12];
+        b1 = b.raw[13];
+        b2 = b.raw[14];
+        b3 = b.raw[15];
+        mx.raw[12] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        mx.raw[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        mx.raw[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        mx.raw[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        *self = mx
     }
 }
 

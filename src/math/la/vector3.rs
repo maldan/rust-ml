@@ -115,6 +115,14 @@ impl Vector3 {
         }
     }
 
+    pub const fn one() -> Vector3 {
+        Vector3 {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        }
+    }
+
     pub fn add_xyz(mut self, x: f32, y: f32, z: f32) -> Vector3 {
         self.x += x;
         self.y += y;
@@ -179,5 +187,13 @@ impl Vector3 {
         self.y = self.y.to_radians();
         self.z = self.z.to_radians();
         self
+    }
+
+    pub fn from_bytes(b: &[u8]) -> Vector3 {
+        Vector3 {
+            x: f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+            y: f32::from_le_bytes([b[4], b[5], b[6], b[7]]),
+            z: f32::from_le_bytes([b[8], b[9], b[10], b[11]]),
+        }
     }
 }

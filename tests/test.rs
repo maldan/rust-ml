@@ -1,24 +1,23 @@
 mod tests {
     use ml::io::mouse;
+    use ml::math::la::quaternion::Quaternion;
     use ml::math::la::vector2::Vector2;
     use ml::math::la::vector3::Vector3;
     use ml::math::random::Random;
     use ml::{math, to_rad};
-    use ml::math::la::quaternion::Quaternion;
 
     #[test]
     fn quat() {
-        let q1 = Quaternion::from_euler(
-            Vector3::new(45.0f32, 0.0, 0.0).to_radians()
-        );
+        let q1 = Quaternion::from_euler(Vector3::new(45.0f32, 0.0, 0.0).to_radians());
 
-        let q2 = Quaternion::from_euler(
-            Vector3::new(45.0f32, 0.0, 0.0).to_radians()
-        );
-        println!("{}", q1*q2);
+        let q2 = Quaternion::from_euler(Vector3::new(45.0f32, 0.0, 0.0).to_radians());
+        println!("{}", q1 * q2);
 
         let v1 = (q1 * q2).to_euler().to_degrees();
         println!("{}", v1);
+
+        // wasm_logger::init(wasm_logger::Config::default());
+        // log::info!("Some info");
     }
 
     #[test]
