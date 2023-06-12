@@ -251,6 +251,10 @@ impl Matrix4x4 {
         return mx;
     }
 
+    pub fn translate_vec3(&mut self, v: Vector3) {
+        self.translate(v.x, v.y, v.z);
+    }
+
     pub fn translate(&mut self, x: f32, y: f32, z: f32) {
         let a00 = self.raw[0];
         let a01 = self.raw[1];

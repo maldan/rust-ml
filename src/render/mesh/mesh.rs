@@ -20,6 +20,7 @@ pub struct MeshData {
     pub bone_weight: Vec<Vector4>,
     pub bone_index: Vec<ColorRGBA>,
     pub bone_list: Vec<Bone>,
+    // pub bone_map: Option<HashMap<String, &Bone>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -43,6 +44,7 @@ impl MeshData {
             bone_weight: vec![],
             bone_index: vec![],
             bone_list: vec![],
+            // bone_map: None,
         }
     }
 
@@ -180,7 +182,7 @@ impl MeshData {
                         let mut bone = Bone::new();
                         bone.name = String::from(name);
                         bone.position = position;
-                        bone.rotation = rotation;
+                        // bone.rotation = rotation;
                         bone_map.insert(String::from(name), Box::new(bone));
                     }
 
@@ -188,7 +190,19 @@ impl MeshData {
                     let r = parse_hierarchy(bytes, offset, 0, &mut bone_map);
                     offset = r.0;
 
-                    mesh.bone_list.push(*r.1);
+                    let bone_list = &mut mesh.bone_list;
+                    bone_list.push(*r.1);
+
+                    // Build bone map
+                    // mesh.bone_map.as_mut().unwrap().insert(String::from("Sex"), &mesh.bone_list[0]);
+
+                    /*fn build_bone_map<'a>(m: &'a mut HashMap<String, &'a Bone>, bl: &'a Vec<Bone>) {
+                        for i in 0..bl.len() {
+                            m.insert(bl[i].name.clone(), &bl[i]);
+                            build_bone_map(m, &bl[i].children);
+                        }
+                    }
+                    build_bone_map(&mut mesh.bone_map.unwrap(), &mesh.bone_list);*/
                 }
                 _ => {
                     offset += size as usize;
@@ -200,8 +214,26 @@ impl MeshData {
             }
         }
 
-        return mesh;
+        mesh
     }
+
+    /*pub fn get_bone_by_name(&mut self, name: &str) -> Option<&mut Bone> {
+        fn sex<'a>(name: &str, list: &'a mut Vec<Bone>) -> Option<&'a mut Bone> {
+            for i in 0..list.len() {
+                if list[i].name == name {
+                    return Some(&mut list[i]);
+                } else {
+                    let r = sex(name, &mut list[i].children);
+                    if r.is_some() {
+                        return r;
+                    }
+                }
+                // return sex(name, &list[i].children);
+            }
+            None
+        }
+        sex(name, &mut self.bone_list)
+    }*/
 }
 
 impl MeshInstance {
