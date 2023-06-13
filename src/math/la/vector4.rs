@@ -112,4 +112,13 @@ impl Vector4 {
         self.w *= v.w;
         self
     }
+
+    pub fn from_bytes(b: &[u8]) -> Vector4 {
+        Vector4 {
+            x: f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+            y: f32::from_le_bytes([b[4], b[5], b[6], b[7]]),
+            z: f32::from_le_bytes([b[8], b[9], b[10], b[11]]),
+            w: f32::from_le_bytes([b[12], b[13], b[14], b[15]]),
+        }
+    }
 }

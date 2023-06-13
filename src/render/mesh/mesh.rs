@@ -10,7 +10,7 @@ use std::ops::Deref;
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct MeshData {
+pub struct MeshData<'a> {
     pub id: u32,
     pub vertex: Vec<Vector3>,
     pub index: Vec<u32>,
@@ -18,9 +18,9 @@ pub struct MeshData {
     pub uv0: Vec<Vector2>,
     pub color0: Vec<Vector3>,
     pub bone_weight: Vec<Vector4>,
-    pub bone_index: Vec<ColorRGBA>,
+    pub bone_index: Vec<Vector4>,
     pub bone_list: Vec<Bone>,
-    // pub bone_map: Option<HashMap<String, &Bone>>,
+    flat_bone_list: Vec<&'a Bone>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -32,7 +32,7 @@ pub struct MeshInstance {
     pub scale: Vector3,
 }
 
-impl MeshData {
+impl<'a> MeshData<'a> {
     pub const fn new() -> Self {
         MeshData {
             id: 0,
@@ -44,7 +44,7 @@ impl MeshData {
             bone_weight: vec![],
             bone_index: vec![],
             bone_list: vec![],
-            // bone_map: None,
+            flat_bone_list: vec![],
         }
     }
 
@@ -105,7 +105,7 @@ impl MeshData {
         return mesh;
     }
 
-    pub fn from_mm2_bytes(bytes: &[u8]) -> MeshData {
+    pub fn from_mm2_bytes(bytes: &[u8]) -> MeshData<'a> {
         let mut mesh = MeshData::new();
         let mut offset = 0;
         let mut bone_map: HashMap<String, Box<Bone>> = HashMap::new();
@@ -150,8 +150,65 @@ impl MeshData {
             // println!("{}", name);
 
             match name {
+                "BONE_WEIGHT" => {
+                    let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
+                    offset += 4;
+
+                    for _ in 0..amount {
+                        let position = Vector4::from_bytes(&bytes[offset..offset + 4 * 4]);
+                        offset += 4 * 4;
+                        mesh.bone_weight.push(position);
+                    }
+                }
+                "BONE_INDEX" => {
+                    let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
+                    offset += 4;
+
+                    for _ in 0..amount {
+                        let position = Vector4::from_bytes(&bytes[offset..offset + 4 * 4]);
+                        offset += 4 * 4;
+                        mesh.bone_index.push(position);
+                    }
+                }
                 "VERTEX" => {
-                    offset += size as usize;
+                    let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
+                    offset += 4;
+
+                    for _ in 0..amount {
+                        let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
+                        offset += 4 * 3;
+                        mesh.vertex.push(position);
+                    }
+                }
+                "UV" => {
+                    let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
+                    offset += 4;
+
+                    for _ in 0..amount {
+                        let position = Vector2::from_bytes(&bytes[offset..offset + 4 * 2]);
+                        offset += 4 * 2;
+                        mesh.uv0.push(position);
+                    }
+                }
+                "NORMAL" => {
+                    let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
+                    offset += 4;
+
+                    for _ in 0..amount {
+                        let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
+                        offset += 4 * 3;
+                        mesh.normal.push(position);
+                    }
+                }
+                "INDEX" => {
+                    let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
+                    offset += 4;
+
+                    for _ in 0..amount {
+                        let index = number::le_slice_to_u32(&bytes[offset..offset + 4]);
+                        offset += 4;
+                        mesh.index.push(index);
+                    }
                 }
                 "BONE" => {
                     let amount = bytes[offset];
@@ -166,17 +223,17 @@ impl MeshData {
                             std::str::from_utf8(&bytes[offset..offset + l as usize]).unwrap();
                         offset += l as usize;
 
-                        log::info!("Bone {}", name);
+                        //log::info!("Bone {}", name);
 
                         // Read position
                         let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
                         offset += 4 * 3;
-                        log::info!("Position {}", position);
+                        //log::info!("Position {}", position);
 
                         // Read rotation
-                        let rotation = Quaternion::from_bytes(&bytes[offset..offset + 4 * 4]);
-                        offset += 4 * 4;
-                        log::info!("Rotation {}", rotation);
+                        // let rotation = Quaternion::from_bytes(&bytes[offset..offset + 4 * 4]);
+                        // offset += 4 * 4;
+                        //log::info!("Rotation {}", rotation);
 
                         // Add bone
                         let mut bone = Bone::new();
@@ -190,8 +247,8 @@ impl MeshData {
                     let r = parse_hierarchy(bytes, offset, 0, &mut bone_map);
                     offset = r.0;
 
-                    let bone_list = &mut mesh.bone_list;
-                    bone_list.push(*r.1);
+                    mesh.bone_list.push(*r.1);
+                    // mesh.flat_bone_list.push(&bone_list[0]);
 
                     // Build bone map
                     // mesh.bone_map.as_mut().unwrap().insert(String::from("Sex"), &mesh.bone_list[0]);
@@ -217,6 +274,18 @@ impl MeshData {
         mesh
     }
 
+    pub fn set_bone_rotation(&mut self, name: &str, q: Quaternion) {
+        fn sex(name: &str, list: &mut Vec<Bone>, q: Quaternion) {
+            for i in 0..list.len() {
+                if list[i].name == name {
+                    list[i].local_rotation = q;
+                } else {
+                    sex(name, &mut list[i].children, q);
+                }
+            }
+        }
+        sex(name, &mut self.bone_list, q)
+    }
     /*pub fn get_bone_by_name(&mut self, name: &str) -> Option<&mut Bone> {
         fn sex<'a>(name: &str, list: &'a mut Vec<Bone>) -> Option<&'a mut Bone> {
             for i in 0..list.len() {

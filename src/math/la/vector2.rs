@@ -87,4 +87,11 @@ impl Vector2 {
         let b = self.y - to.y;
         f32::sqrt(a * a + b * b)
     }
+
+    pub fn from_bytes(b: &[u8]) -> Vector2 {
+        Vector2 {
+            x: f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+            y: f32::from_le_bytes([b[4], b[5], b[6], b[7]]),
+        }
+    }
 }
