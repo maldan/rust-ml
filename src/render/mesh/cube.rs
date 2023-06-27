@@ -2,7 +2,7 @@ use crate::math::la::vector2::Vector2;
 use crate::math::la::vector3::Vector3;
 use crate::render::mesh::mesh::MeshData;
 
-pub fn new(size: Vector3, side: u8) -> MeshData<'static> {
+pub fn new(size: Vector3, side: u8) -> MeshData {
     let mut m = MeshData::new();
 
     // Front

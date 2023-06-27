@@ -191,7 +191,7 @@ impl Matrix4x4 {
     }
 
     pub fn invert(self) -> Matrix4x4 {
-        let mut mx = Matrix4x4::default();
+        let mut mx = Matrix4x4::new();
 
         let a00 = self.raw[0];
         let a01 = self.raw[1];
@@ -407,11 +407,113 @@ impl Matrix4x4 {
         self.raw[14] = 2.0 * far * near * nf;
     }
 
+    pub fn get_scale(&self) -> Vector3 {
+        let m11 = self.raw[0];
+        let m12 = self.raw[1];
+        let m13 = self.raw[2];
+        let m21 = self.raw[4];
+        let m22 = self.raw[5];
+        let m23 = self.raw[6];
+        let m31 = self.raw[8];
+        let m32 = self.raw[9];
+        let m33 = self.raw[10];
+
+        Vector3 {
+            x: (m11 * m11 + m12 * m12 + m13 * m13).sqrt(),
+            y: (m21 * m21 + m22 * m22 + m23 * m23).sqrt(),
+            z: (m31 * m31 + m32 * m32 + m33 * m33).sqrt(),
+        }
+    }
+
     pub fn get_position(&self) -> Vector3 {
         Vector3 {
             x: self.raw[12],
             y: self.raw[13],
             z: self.raw[14],
         }
+    }
+
+    pub fn get_rotation(&self) -> Quaternion {
+        let scaling = self.get_scale();
+
+        let is1 = 1.0 / scaling.x;
+        let is2 = 1.0 / scaling.y;
+        let is3 = 1.0 / scaling.z;
+
+        let sm11 = self.raw[0] * is1;
+        let sm12 = self.raw[1] * is2;
+        let sm13 = self.raw[2] * is3;
+        let sm21 = self.raw[4] * is1;
+        let sm22 = self.raw[5] * is2;
+        let sm23 = self.raw[6] * is3;
+        let sm31 = self.raw[8] * is1;
+        let sm32 = self.raw[9] * is2;
+        let sm33 = self.raw[10] * is3;
+
+        let trace = sm11 + sm22 + sm33;
+        let mut s = 0.0;
+        let mut out = Quaternion::new();
+
+        if trace > 0.0 {
+            s = (trace + 1.0).sqrt() * 2.0;
+            out.x = (sm23 - sm32) / s;
+            out.y = (sm31 - sm13) / s;
+            out.z = (sm12 - sm21) / s;
+            out.w = 0.25 * s;
+            /*
+            out[0] = (sm23 - sm32) / S;
+            out[1] = (sm31 - sm13) / S;
+            out[2] = (sm12 - sm21) / S;
+            out[3] = 0.25 * S;
+            */
+        } else if sm11 > sm22 && sm11 > sm33 {
+            s = (1.0 + sm11 - sm22 - sm33).sqrt() * 2.0;
+            out.x = 0.25 * s;
+            out.y = (sm12 + sm21) / s;
+            out.z = (sm31 + sm13) / s;
+            out.w = (sm23 - sm32) / s;
+            /*
+            out[0] = 0.25 * S;
+            out[1] = (sm12 + sm21) / S;
+            out[2] = (sm31 + sm13) / S;
+            out[3] = (sm23 - sm32) / S;
+            */
+        } else if sm22 > sm33 {
+            s = (1.0 + sm22 - sm11 - sm33).sqrt() * 2.0;
+            out.x = (sm12 + sm21) / s;
+            out.y = 0.25 * s;
+            out.z = (sm23 + sm32) / s;
+            out.w = (sm31 - sm13) / s;
+            /*
+            out[0] = (sm12 + sm21) / S;
+            out[1] = 0.25 * S;
+            out[2] = (sm23 + sm32) / S;
+            out[3] = (sm31 - sm13) / S;
+            */
+        } else {
+            s = (1.0 + sm33 - sm11 - sm22).sqrt() * 2.0;
+            /*
+            out[0] = (sm31 + sm13) / S;
+            out[1] = (sm23 + sm32) / S;
+            out[2] = 0.25 * S;
+            out[3] = (sm12 - sm21) / S;
+            */
+            out.x = (sm31 + sm13) / s;
+            out.y = (sm23 + sm32) / s;
+            out.z = 0.25 * s;
+            out.w = (sm12 - sm21) / s;
+        }
+
+        return out;
+    }
+
+    pub fn from_bytes(b: &[u8]) -> Matrix4x4 {
+        let mut o = Matrix4x4::new();
+        let mut offset = 0;
+        for i in 0..16 {
+            o.raw[i] = f32::from_le_bytes([b[offset], b[offset + 1], b[offset + 2], b[offset + 3]]);
+            offset += 4;
+        }
+        o
     }
 }

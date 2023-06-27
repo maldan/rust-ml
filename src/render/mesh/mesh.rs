@@ -1,16 +1,21 @@
 use crate::image::color::ColorRGBA;
+use crate::math::la::matrix4::Matrix4x4;
 use crate::math::la::quaternion::Quaternion;
 use crate::math::la::vector2::Vector2;
 use crate::math::la::vector3::Vector3;
 use crate::math::la::vector4::Vector4;
 use crate::math::number;
 use crate::render::mesh::bone::Bone;
+use log::log;
+use std::cell::RefMut;
 use std::collections::HashMap;
+use std::ffi::c_char;
 use std::ops::Deref;
+use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 #[repr(C)]
-pub struct MeshData<'a> {
+pub struct MeshData {
     pub id: u32,
     pub vertex: Vec<Vector3>,
     pub index: Vec<u32>,
@@ -20,7 +25,10 @@ pub struct MeshData<'a> {
     pub bone_weight: Vec<Vector4>,
     pub bone_index: Vec<Vector4>,
     pub bone_list: Vec<Bone>,
-    flat_bone_list: Vec<&'a Bone>,
+    pub bone_root_id: usize,
+    // pub bone_list2: Vec<Rc<Bone>>,
+    // bone_parent_map: Vec<Vec<u32>>,
+    // flat_bone_list: Vec<&'a Bone>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -32,7 +40,7 @@ pub struct MeshInstance {
     pub scale: Vector3,
 }
 
-impl<'a> MeshData<'a> {
+impl MeshData {
     pub const fn new() -> Self {
         MeshData {
             id: 0,
@@ -44,7 +52,10 @@ impl<'a> MeshData<'a> {
             bone_weight: vec![],
             bone_index: vec![],
             bone_list: vec![],
-            flat_bone_list: vec![],
+            bone_root_id: 0,
+            // bone_list2: vec![],
+            //flat_bone_list: vec![],
+            //bone_parent_map: vec![],
         }
     }
 
@@ -105,35 +116,38 @@ impl<'a> MeshData<'a> {
         return mesh;
     }
 
-    pub fn from_mm2_bytes(bytes: &[u8]) -> MeshData<'a> {
+    pub fn from_mm2_bytes(bytes: &[u8]) -> MeshData {
         let mut mesh = MeshData::new();
         let mut offset = 0;
-        let mut bone_map: HashMap<String, Box<Bone>> = HashMap::new();
+
+        // Pre init bone parent map
+        let mut bone_parent_map: Vec<Vec<u32>> = vec![];
+        for _ in 0..255 {
+            bone_parent_map.push(vec![]);
+            mesh.bone_list.push(Bone::new());
+        }
 
         fn parse_hierarchy(
             b: &[u8],
             mut offset: usize,
-            ident: usize,
-            bm: &mut HashMap<String, Box<Bone>>,
-        ) -> (usize, Box<Bone>) {
+            v: &mut Vec<Vec<u32>>,
+            ident: i32,
+        ) -> (usize, u32) {
             // Read bone name
-            let l = b[offset];
+            let bone_index = b[offset] as u32;
             offset += 1;
-            let name = std::str::from_utf8(&b[offset..offset + l as usize]).unwrap();
-            offset += l as usize;
-            // log::info!("H Bone {} {}", "-".repeat(ident), name);
 
-            let mut current_bone = bm.get(name).unwrap().clone();
+            // log::info!("Bone {} {}", "-".repeat(ident as usize), bone_index);
 
             // Childs
             let amount = b[offset];
             offset += 1;
             for _ in 0..amount {
-                let r = parse_hierarchy(b, offset, ident + 2, bm);
+                let r = parse_hierarchy(b, offset, v, ident + 1);
                 offset = r.0;
-                current_bone.children.push(*r.1);
+                v[bone_index as usize].push(r.1);
             }
-            (offset, current_bone)
+            (offset, bone_index)
         }
 
         loop {
@@ -179,6 +193,8 @@ impl<'a> MeshData<'a> {
                         offset += 4 * 3;
                         mesh.vertex.push(position);
                     }
+
+                    log::info!("VERTEX DONE")
                 }
                 "UV" => {
                     let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
@@ -189,6 +205,8 @@ impl<'a> MeshData<'a> {
                         offset += 4 * 2;
                         mesh.uv0.push(position);
                     }
+
+                    log::info!("UV DONE")
                 }
                 "NORMAL" => {
                     let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
@@ -199,6 +217,8 @@ impl<'a> MeshData<'a> {
                         offset += 4 * 3;
                         mesh.normal.push(position);
                     }
+
+                    log::info!("NORMAL DONE")
                 }
                 "INDEX" => {
                     let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
@@ -209,6 +229,8 @@ impl<'a> MeshData<'a> {
                         offset += 4;
                         mesh.index.push(index);
                     }
+
+                    log::info!("INDEX DONE")
                 }
                 "BONE" => {
                     let amount = bytes[offset];
@@ -223,7 +245,11 @@ impl<'a> MeshData<'a> {
                             std::str::from_utf8(&bytes[offset..offset + l as usize]).unwrap();
                         offset += l as usize;
 
-                        //log::info!("Bone {}", name);
+                        // Bone index
+                        let bone_index = bytes[offset];
+                        offset += 1;
+
+                        log::info!("Bone {} - {} - {}", name, bone_index, i);
 
                         // Read position
                         let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
@@ -231,23 +257,51 @@ impl<'a> MeshData<'a> {
                         //log::info!("Position {}", position);
 
                         // Read rotation
-                        // let rotation = Quaternion::from_bytes(&bytes[offset..offset + 4 * 4]);
-                        // offset += 4 * 4;
+                        let rotation = Quaternion::from_bytes(&bytes[offset..offset + 4 * 4]);
+                        offset += 4 * 4;
                         //log::info!("Rotation {}", rotation);
+
+                        let inverse_bind_matrix =
+                            Matrix4x4::from_bytes(&bytes[offset..offset + 4 * 4 * 4]);
+                        offset += 4 * 4 * 4;
 
                         // Add bone
                         let mut bone = Bone::new();
+                        bone.id = bone_index as u32;
                         bone.name = String::from(name);
                         bone.position = position;
-                        // bone.rotation = rotation;
-                        bone_map.insert(String::from(name), Box::new(bone));
+                        bone.rotation = rotation;
+                        bone.inverse_bind_matrix = inverse_bind_matrix;
+                        log::info!(
+                            "Position {} | Rotation {}",
+                            bone.position,
+                            bone.rotation.to_euler().to_degrees()
+                        );
+                        log::info!(
+                            "Inversed Position {} | Inversed Rotation {}",
+                            bone.inverse_bind_matrix.get_position(),
+                            bone.inverse_bind_matrix
+                                .get_rotation()
+                                .to_euler()
+                                .to_degrees(),
+                        );
+                        mesh.bone_list[bone_index as usize] = bone;
+
+                        // bone_map.insert(String::from(name), Box::new(bone));
                     }
 
+                    // Set root id
+                    mesh.bone_root_id = bytes[offset] as usize; // first id
+
                     // Read hierarchy
-                    let r = parse_hierarchy(bytes, offset, 0, &mut bone_map);
+                    let r = parse_hierarchy(bytes, offset, &mut bone_parent_map, 0);
                     offset = r.0;
 
-                    mesh.bone_list.push(*r.1);
+                    for i in 0..mesh.bone_list.len() {
+                        let id = mesh.bone_list[i].id;
+                        mesh.bone_list[i].children = bone_parent_map[id as usize].clone();
+                    }
+
                     // mesh.flat_bone_list.push(&bone_list[0]);
 
                     // Build bone map
@@ -274,7 +328,28 @@ impl<'a> MeshData<'a> {
         mesh
     }
 
-    pub fn set_bone_rotation(&mut self, name: &str, q: Quaternion) {
+    pub fn calculate_bones(&mut self, start_index: usize) {
+        fn do_x(start_index: usize, bone_list: &mut Vec<Bone>, parent: Matrix4x4) {
+            let bone = &mut bone_list[start_index];
+            bone.matrix.identity();
+            bone.matrix.translate_vec3(bone.position);
+            bone.matrix.rotate_quaternion(bone.rotation);
+
+            // bone.matrix *= parent;
+
+            let children = bone_list[start_index].children.clone();
+            let matrix = bone_list[start_index].matrix;
+
+            // Calculate childrens
+            for id in children.iter() {
+                do_x(*id as usize, bone_list, parent);
+            }
+        }
+
+        do_x(start_index, &mut self.bone_list, Matrix4x4::new());
+    }
+
+    /*pub fn set_bone_rotation(&mut self, name: &str, q: Quaternion) {
         fn sex(name: &str, list: &mut Vec<Bone>, q: Quaternion) {
             for i in 0..list.len() {
                 if list[i].name == name {
@@ -286,6 +361,24 @@ impl<'a> MeshData<'a> {
         }
         sex(name, &mut self.bone_list, q)
     }
+
+    pub fn get_bone_by_id(&self, id: u32) -> Option<Bone> {
+        fn sex(id: u32, list: &Vec<Bone>) -> Option<Bone> {
+            for i in 0..list.len() {
+                if list[i].id == id {
+                    return Some(list[i].clone());
+                } else {
+                    let r = sex(id, &list[i].children);
+                    if r.is_some() {
+                        return r;
+                    }
+                }
+            }
+            None
+        }
+        sex(id, &self.bone_list)
+    }*/
+
     /*pub fn get_bone_by_name(&mut self, name: &str) -> Option<&mut Bone> {
         fn sex<'a>(name: &str, list: &'a mut Vec<Bone>) -> Option<&'a mut Bone> {
             for i in 0..list.len() {

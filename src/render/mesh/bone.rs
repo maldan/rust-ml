@@ -6,30 +6,39 @@ use crate::math::la::vector3::Vector3;
 #[repr(C)]
 pub struct Bone {
     pub name: String,
-    pub index: u32,
+    pub id: u32,
     pub position: Vector3,
+    pub rotation: Quaternion,
     pub local_rotation: Quaternion,
     pub local_position: Vector3,
     pub local_scale: Vector3,
     pub matrix: Matrix4x4,
-    pub children: Vec<Bone>,
+    pub inverse_bind_matrix: Matrix4x4,
+
+    pub children: Vec<u32>,
 }
 
 impl Bone {
     pub const fn new() -> Bone {
         Bone {
             name: String::new(),
-            index: 0,
+            id: 0,
             position: Vector3::zero(),
+            rotation: Quaternion::new(),
             local_position: Vector3::zero(),
             local_rotation: Quaternion::new(),
             local_scale: Vector3::one(),
             matrix: Matrix4x4::new(),
+            inverse_bind_matrix: Matrix4x4::new(),
             children: vec![],
         }
     }
 
-    pub fn calculate(&mut self, parent: Matrix4x4) {
+    /*pub fn calculate(&mut self, parent: Matrix4x4) {
+
+    }*/
+
+    /*pub fn calculate(&mut self, parent: Matrix4x4) {
         self.matrix.identity();
 
         //self.matrix
@@ -52,5 +61,5 @@ impl Bone {
             (*f)(self, &self.children[i]);
             self.children[i].for_each(f);
         }
-    }
+    }*/
 }
