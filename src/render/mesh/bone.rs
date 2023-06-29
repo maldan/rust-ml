@@ -15,6 +15,8 @@ pub struct Bone {
     pub matrix: Matrix4x4,
     pub inverse_bind_matrix: Matrix4x4,
 
+    pub out_position: Vector3,
+
     pub children: Vec<u32>,
 }
 
@@ -30,6 +32,9 @@ impl Bone {
             local_scale: Vector3::one(),
             matrix: Matrix4x4::new(),
             inverse_bind_matrix: Matrix4x4::new(),
+
+            out_position: Vector3::zero(),
+
             children: vec![],
         }
     }

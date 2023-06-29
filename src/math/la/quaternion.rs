@@ -151,7 +151,7 @@ impl Quaternion {
         let y = self.y;
         let z = self.z;
 
-        let wx = w * x;
+        /*let wx = w * x;
         let wy = w * y;
         let wz = w * z;
         let xx = x * x;
@@ -159,9 +159,49 @@ impl Quaternion {
         let xz = x * z;
         let yy = y * y;
         let yz = y * z;
-        let zz = z * z;
+        let zz = z * z;*/
 
-        Matrix4x4 {
+        let x2 = x + x;
+        let y2 = y + y;
+        let z2 = z + z;
+        let xx = x * x2;
+        let xy = x * y2;
+        let xz = x * z2;
+        let yy = y * y2;
+        let yz = y * z2;
+        let zz = z * z2;
+        let wx = w * x2;
+        let wy = w * y2;
+        let wz = w * z2;
+
+        let mut mx = Matrix4x4::new();
+
+        mx.raw[0] = 1.0 - (yy + zz);
+        mx.raw[4] = xy - wz;
+        mx.raw[8] = xz + wy;
+
+        mx.raw[1] = xy + wz;
+        mx.raw[5] = 1.0 - (xx + zz);
+        mx.raw[9] = yz - wx;
+
+        mx.raw[2] = xz - wy;
+        mx.raw[6] = yz + wx;
+        mx.raw[10] = 1.0 - (xx + yy);
+
+        // last column
+        mx.raw[3] = 0.0;
+        mx.raw[7] = 0.0;
+        mx.raw[11] = 0.0;
+
+        // bottom row
+        mx.raw[12] = 0.0;
+        mx.raw[13] = 0.0;
+        mx.raw[14] = 0.0;
+        mx.raw[15] = 1.0;
+
+        mx
+
+        /*Matrix4x4 {
             raw: [
                 1.0 - 2.0 * (yy + zz),
                 2.0 * (xy - wz),
@@ -180,7 +220,7 @@ impl Quaternion {
                 0.0,
                 1.0,
             ],
-        }
+        }*/
     }
 
     pub fn from_euler(v: Vector3) -> Quaternion {

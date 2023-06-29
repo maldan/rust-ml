@@ -270,6 +270,7 @@ impl MeshData {
                         bone.id = bone_index as u32;
                         bone.name = String::from(name);
                         bone.position = position;
+                        //bone.position = Vector3::zero() * inverse_bind_matrix.invert();
                         bone.rotation = rotation;
                         bone.inverse_bind_matrix = inverse_bind_matrix;
                         log::info!(
@@ -331,18 +332,20 @@ impl MeshData {
     pub fn calculate_bones(&mut self, start_index: usize) {
         fn do_x(start_index: usize, bone_list: &mut Vec<Bone>, parent: Matrix4x4) {
             let bone = &mut bone_list[start_index];
-            bone.matrix.identity();
-            bone.matrix.translate_vec3(bone.position);
-            bone.matrix.rotate_quaternion(bone.rotation);
 
-            // bone.matrix *= parent;
+            let mut mx = Matrix4x4::new();
+            mx.translate_vec3(bone.position);
+            mx *= (bone.rotation * bone.local_rotation).to_matrix4x4();
+            //mx.rotate_quaternion(bone.rotation);
+
+            bone.matrix = parent * mx;
 
             let children = bone_list[start_index].children.clone();
             let matrix = bone_list[start_index].matrix;
 
             // Calculate childrens
             for id in children.iter() {
-                do_x(*id as usize, bone_list, parent);
+                do_x(*id as usize, bone_list, matrix);
             }
         }
 

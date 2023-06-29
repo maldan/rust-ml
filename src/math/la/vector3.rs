@@ -101,6 +101,17 @@ impl ops::AddAssign<Vector3> for Vector3 {
     }
 }
 
+// Sub Vector3 -= Vector3
+impl ops::SubAssign<Vector3> for Vector3 {
+    fn sub_assign(&mut self, other: Vector3) {
+        *self = Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+        }
+    }
+}
+
 #[allow(dead_code)]
 impl Vector3 {
     pub const fn new(x: f32, y: f32, z: f32) -> Vector3 {
