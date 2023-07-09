@@ -1,4 +1,5 @@
 use crate::math::la::matrix4::Matrix4x4;
+use crate::math::la::vector4::Vector4;
 use std::fmt;
 use std::ops;
 
@@ -206,5 +207,9 @@ impl Vector3 {
             y: f32::from_le_bytes([b[4], b[5], b[6], b[7]]),
             z: f32::from_le_bytes([b[8], b[9], b[10], b[11]]),
         }
+    }
+
+    pub fn from_vector4(v: Vector4) -> Vector3 {
+        Vector3::new(v.x, v.y, v.z)
     }
 }

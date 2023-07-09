@@ -4,9 +4,9 @@ mod tests {
     use ml::math::la::vector2::Vector2;
     use ml::math::la::vector3::Vector3;
     use ml::math::random::Random;
-    use ml::{math, to_rad};
+    use ml::{math};
 
-    #[test]
+    /*#[test]
     fn quat() {
         let q1 = Quaternion::from_euler(Vector3::new(45.0f32, 0.0, 0.0).to_radians());
 
@@ -15,9 +15,16 @@ mod tests {
 
         let v1 = (q1 * q2).to_euler().to_degrees();
         println!("{}", v1);
+    }*/
 
-        // wasm_logger::init(wasm_logger::Config::default());
-        // log::info!("Some info");
+    #[test]
+    fn quat_lerp() {
+        let q1 = Quaternion::from_euler(Vector3::new(45.0f32, 0.0, 0.0).to_radians());
+        let q2 = Quaternion::from_euler(Vector3::new(90.0f32, 0.0, 0.0).to_radians());
+
+        println!("{}", Quaternion::lerp(q1, q2, 0.0).to_euler().to_degrees());
+        println!("{}", Quaternion::lerp(q1, q2, 0.5).to_euler().to_degrees());
+        println!("{}", Quaternion::lerp(q1, q2, 1.0).to_euler().to_degrees());
     }
 
     #[test]
@@ -32,11 +39,6 @@ mod tests {
         let v1 = Vector2::default();
         let v2 = Vector2::new(1.0, 1.0);
         println!("{}", (v1 - v2).normalize());
-    }
-
-    #[test]
-    fn sas3() {
-        println!("{}", to_rad!(180));
     }
 
     #[test]

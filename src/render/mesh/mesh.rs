@@ -5,6 +5,8 @@ use crate::math::la::vector2::Vector2;
 use crate::math::la::vector3::Vector3;
 use crate::math::la::vector4::Vector4;
 use crate::math::number;
+use crate::math::number::{le_slice_to_f32, le_slice_to_i16, le_slice_to_u16, F32Ext};
+use crate::render::mesh::animation::MeshAnimation;
 use crate::render::mesh::bone::Bone;
 use log::log;
 use std::cell::RefMut;
@@ -26,9 +28,9 @@ pub struct MeshData {
     pub bone_index: Vec<Vector4>,
     pub bone_list: Vec<Bone>,
     pub bone_root_id: usize,
-    // pub bone_list2: Vec<Rc<Bone>>,
-    // bone_parent_map: Vec<Vec<u32>>,
-    // flat_bone_list: Vec<&'a Bone>,
+
+    bone_name_to_id: Option<HashMap<String, u32>>,
+    pub animation_list: Vec<MeshAnimation>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -52,7 +54,9 @@ impl MeshData {
             bone_weight: vec![],
             bone_index: vec![],
             bone_list: vec![],
+            animation_list: vec![],
             bone_root_id: 0,
+            bone_name_to_id: None,
             // bone_list2: vec![],
             //flat_bone_list: vec![],
             //bone_parent_map: vec![],
@@ -119,6 +123,7 @@ impl MeshData {
     pub fn from_mm2_bytes(bytes: &[u8]) -> MeshData {
         let mut mesh = MeshData::new();
         let mut offset = 0;
+        mesh.bone_name_to_id = Some(HashMap::new());
 
         // Pre init bone parent map
         let mut bone_parent_map: Vec<Vec<u32>> = vec![];
@@ -150,6 +155,12 @@ impl MeshData {
             (offset, bone_index)
         }
 
+        // Info params
+        let mut vertex_precision = 4;
+        let mut uv_precision = 4;
+        let mut index_precision = 4;
+        let mut normal_precision = 4;
+
         loop {
             // Read section name
             let l = bytes[offset];
@@ -164,14 +175,54 @@ impl MeshData {
             // println!("{}", name);
 
             match name {
+                "INFO" => {
+                    // Version
+                    log::info!("Version: {}", bytes[offset]);
+                    offset += 1;
+
+                    // Vertex
+                    log::info!("Vertex Precision: {}", bytes[offset]);
+                    if bytes[offset] != 0 {
+                        vertex_precision = bytes[offset]
+                    }
+                    offset += 1;
+
+                    // UV
+                    log::info!("UV Precision: {}", bytes[offset]);
+                    if bytes[offset] != 0 {
+                        uv_precision = bytes[offset]
+                    }
+                    offset += 1;
+
+                    // Index
+                    log::info!("Index Precision: {}", bytes[offset]);
+                    if bytes[offset] != 0 {
+                        index_precision = bytes[offset]
+                    }
+                    offset += 1;
+
+                    // Normal
+                    log::info!("Normal Precision: {}", bytes[offset]);
+                    if bytes[offset] != 0 {
+                        normal_precision = bytes[offset]
+                    }
+                    offset += 1;
+                }
                 "BONE_WEIGHT" => {
                     let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
                     offset += 4;
 
                     for _ in 0..amount {
-                        let position = Vector4::from_bytes(&bytes[offset..offset + 4 * 4]);
-                        offset += 4 * 4;
-                        mesh.bone_weight.push(position);
+                        /*let position = Vector4::from_bytes(&bytes[offset..offset + 4 * 4]);
+                        offset += 4 * 4;*/
+
+                        mesh.bone_weight.push(Vector4::new(
+                            bytes[offset] as f32 / 255.0,
+                            bytes[offset + 1] as f32 / 255.0,
+                            bytes[offset + 2] as f32 / 255.0,
+                            bytes[offset + 3] as f32 / 255.0,
+                        ));
+                        offset += 4;
                     }
                 }
                 "BONE_INDEX" => {
@@ -179,19 +230,63 @@ impl MeshData {
                     offset += 4;
 
                     for _ in 0..amount {
-                        let position = Vector4::from_bytes(&bytes[offset..offset + 4 * 4]);
+                        mesh.bone_index.push(Vector4::new(
+                            bytes[offset] as f32,
+                            bytes[offset + 1] as f32,
+                            bytes[offset + 2] as f32,
+                            bytes[offset + 3] as f32,
+                        ));
+                        offset += 4;
+
+                        /*let position = Vector4::from_bytes(&bytes[offset..offset + 4 * 4]);
                         offset += 4 * 4;
-                        mesh.bone_index.push(position);
+                        mesh.bone_index.push(position);*/
                     }
                 }
                 "VERTEX" => {
                     let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
                     offset += 4;
 
-                    for _ in 0..amount {
-                        let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
-                        offset += 4 * 3;
-                        mesh.vertex.push(position);
+                    // Default float32 precision
+                    if vertex_precision == 4 {
+                        for _ in 0..amount {
+                            let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
+                            offset += 4 * 3;
+                            mesh.vertex.push(position);
+                        }
+                    }
+
+                    // Float16 precision
+                    if vertex_precision == 2 {
+                        // Read min and max
+                        let min_x = le_slice_to_f32(&bytes[offset..offset + 4]);
+                        offset += 4;
+                        let max_x = le_slice_to_f32(&bytes[offset..offset + 4]);
+                        offset += 4;
+                        let min_y = le_slice_to_f32(&bytes[offset..offset + 4]);
+                        offset += 4;
+                        let max_y = le_slice_to_f32(&bytes[offset..offset + 4]);
+                        offset += 4;
+                        let min_z = le_slice_to_f32(&bytes[offset..offset + 4]);
+                        offset += 4;
+                        let max_z = le_slice_to_f32(&bytes[offset..offset + 4]);
+                        offset += 4;
+
+                        // Unpack vertex
+                        for _ in 0..amount {
+                            let x = le_slice_to_i16(&bytes[offset..offset + 2]);
+                            offset += 2;
+                            let y = le_slice_to_i16(&bytes[offset..offset + 2]);
+                            offset += 2;
+                            let z = le_slice_to_i16(&bytes[offset..offset + 2]);
+                            offset += 2;
+
+                            mesh.vertex.push(Vector3::new(
+                                (x as f32 / 0x7FFF as f32).denormalize(min_x, max_x),
+                                (y as f32 / 0x7FFF as f32).denormalize(min_y, max_y),
+                                (z as f32 / 0x7FFF as f32).denormalize(min_z, max_z),
+                            ));
+                        }
                     }
 
                     log::info!("VERTEX DONE")
@@ -200,10 +295,30 @@ impl MeshData {
                     let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
                     offset += 4;
 
-                    for _ in 0..amount {
-                        let position = Vector2::from_bytes(&bytes[offset..offset + 4 * 2]);
-                        offset += 4 * 2;
-                        mesh.uv0.push(position);
+                    // Default float32 precision
+                    if uv_precision == 4 {
+                        for _ in 0..amount {
+                            let position = Vector2::from_bytes(&bytes[offset..offset + 4 * 2]);
+                            offset += 4 * 2;
+                            mesh.uv0.push(position);
+                        }
+                    }
+                    // Float16 precision
+                    if uv_precision == 2 {
+                        for _ in 0..amount {
+                            let x = le_slice_to_u16(&bytes[offset..offset + 2]);
+                            offset += 2;
+                            let y = le_slice_to_u16(&bytes[offset..offset + 2]);
+                            offset += 2;
+                            mesh.uv0.push(Vector2::new(
+                                x as f32 / 0xFFFF as f32,
+                                y as f32 / 0xFFFF as f32,
+                            ));
+
+                            /*let position = Vector2::from_bytes(&bytes[offset..offset + 4 * 2]);
+                            offset += 4 * 2;
+                            mesh.uv0.push(position);*/
+                        }
                     }
 
                     log::info!("UV DONE")
@@ -212,10 +327,30 @@ impl MeshData {
                     let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
                     offset += 4;
 
-                    for _ in 0..amount {
-                        let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
-                        offset += 4 * 3;
-                        mesh.normal.push(position);
+                    // Default float32 precision
+                    if normal_precision == 4 {
+                        for _ in 0..amount {
+                            let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
+                            offset += 4 * 3;
+                            mesh.normal.push(position);
+                        }
+                    }
+                    // Float16 precision
+                    if uv_precision == 2 {
+                        for _ in 0..amount {
+                            let x = le_slice_to_i16(&bytes[offset..offset + 2]);
+                            offset += 2;
+                            let y = le_slice_to_i16(&bytes[offset..offset + 2]);
+                            offset += 2;
+                            let z = le_slice_to_i16(&bytes[offset..offset + 2]);
+                            offset += 2;
+
+                            mesh.normal.push(Vector3::new(
+                                x as f32 / 0x7FFF as f32,
+                                y as f32 / 0x7FFF as f32,
+                                z as f32 / 0x7FFF as f32,
+                            ));
+                        }
                     }
 
                     log::info!("NORMAL DONE")
@@ -224,10 +359,21 @@ impl MeshData {
                     let amount = number::le_slice_to_u32(&bytes[offset..offset + 4]);
                     offset += 4;
 
-                    for _ in 0..amount {
-                        let index = number::le_slice_to_u32(&bytes[offset..offset + 4]);
-                        offset += 4;
-                        mesh.index.push(index);
+                    // Default uint32 precision
+                    if index_precision == 4 {
+                        for _ in 0..amount {
+                            let index = number::le_slice_to_u32(&bytes[offset..offset + 4]);
+                            offset += 4;
+                            mesh.index.push(index);
+                        }
+                    }
+                    // uint16 precision
+                    if index_precision == 2 {
+                        for _ in 0..amount {
+                            let index = number::le_slice_to_u16(&bytes[offset..offset + 2]);
+                            offset += 2;
+                            mesh.index.push(index as u32);
+                        }
                     }
 
                     log::info!("INDEX DONE")
@@ -249,31 +395,60 @@ impl MeshData {
                         let bone_index = bytes[offset];
                         offset += 1;
 
-                        log::info!("Bone {} - {} - {}", name, bone_index, i);
+                        // log::info!("Bone {} - {} - {}", name, bone_index, i);
 
                         // Read position
                         let position = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
                         offset += 4 * 3;
-                        //log::info!("Position {}", position);
 
                         // Read rotation
                         let rotation = Quaternion::from_bytes(&bytes[offset..offset + 4 * 4]);
                         offset += 4 * 4;
-                        //log::info!("Rotation {}", rotation);
 
-                        let inverse_bind_matrix =
+                        let mut inverse_bind_matrix = Matrix4x4::new();
+                        let m1 = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
+                        offset += 4 * 3;
+                        let m2 = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
+                        offset += 4 * 3;
+                        let m3 = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
+                        offset += 4 * 3;
+                        let m4 = Vector3::from_bytes(&bytes[offset..offset + 4 * 3]);
+                        offset += 4 * 3;
+
+                        // Row 1
+                        inverse_bind_matrix.raw[0] = m1.x;
+                        inverse_bind_matrix.raw[1] = m1.y;
+                        inverse_bind_matrix.raw[2] = m1.z;
+                        inverse_bind_matrix.raw[3] = 0.0;
+                        // Row 2
+                        inverse_bind_matrix.raw[4] = m2.x;
+                        inverse_bind_matrix.raw[5] = m2.y;
+                        inverse_bind_matrix.raw[6] = m2.z;
+                        inverse_bind_matrix.raw[7] = 0.0;
+                        // Row 3
+                        inverse_bind_matrix.raw[8] = m3.x;
+                        inverse_bind_matrix.raw[9] = m3.y;
+                        inverse_bind_matrix.raw[10] = m3.z;
+                        inverse_bind_matrix.raw[11] = 0.0;
+                        // Row 4
+                        inverse_bind_matrix.raw[12] = m4.x;
+                        inverse_bind_matrix.raw[13] = m4.y;
+                        inverse_bind_matrix.raw[14] = m4.z;
+                        inverse_bind_matrix.raw[15] = 1.0;
+
+                        /*let inverse_bind_matrix =
                             Matrix4x4::from_bytes(&bytes[offset..offset + 4 * 4 * 4]);
-                        offset += 4 * 4 * 4;
+                        offset += 4 * 4 * 4;*/
 
                         // Add bone
                         let mut bone = Bone::new();
                         bone.id = bone_index as u32;
                         bone.name = String::from(name);
                         bone.position = position;
-                        //bone.position = Vector3::zero() * inverse_bind_matrix.invert();
                         bone.rotation = rotation;
                         bone.inverse_bind_matrix = inverse_bind_matrix;
-                        log::info!(
+                        bone.is_changed = true;
+                        /*log::info!(
                             "Position {} | Rotation {}",
                             bone.position,
                             bone.rotation.to_euler().to_degrees()
@@ -285,10 +460,20 @@ impl MeshData {
                                 .get_rotation()
                                 .to_euler()
                                 .to_degrees(),
-                        );
+                        );*/
                         mesh.bone_list[bone_index as usize] = bone;
 
-                        // bone_map.insert(String::from(name), Box::new(bone));
+                        // Fill
+                        match &mut mesh.bone_name_to_id {
+                            Some(map) => {
+                                map.insert(String::from(name), bone_index as u32);
+                            }
+                            None => {}
+                        }
+                        /*mesh.bone_name_to_id
+                        .as_mut()
+                        .unwrap()
+                        .insert(bone_index as u32, String::from(name));*/
                     }
 
                     // Set root id
@@ -303,18 +488,7 @@ impl MeshData {
                         mesh.bone_list[i].children = bone_parent_map[id as usize].clone();
                     }
 
-                    // mesh.flat_bone_list.push(&bone_list[0]);
-
-                    // Build bone map
-                    // mesh.bone_map.as_mut().unwrap().insert(String::from("Sex"), &mesh.bone_list[0]);
-
-                    /*fn build_bone_map<'a>(m: &'a mut HashMap<String, &'a Bone>, bl: &'a Vec<Bone>) {
-                        for i in 0..bl.len() {
-                            m.insert(bl[i].name.clone(), &bl[i]);
-                            build_bone_map(m, &bl[i].children);
-                        }
-                    }
-                    build_bone_map(&mut mesh.bone_map.unwrap(), &mesh.bone_list);*/
+                    log::info!("BONE DONE")
                 }
                 _ => {
                     offset += size as usize;
@@ -333,12 +507,13 @@ impl MeshData {
         fn do_x(start_index: usize, bone_list: &mut Vec<Bone>, parent: Matrix4x4) {
             let bone = &mut bone_list[start_index];
 
-            let mut mx = Matrix4x4::new();
-            mx.translate_vec3(bone.position);
-            mx *= (bone.rotation * bone.local_rotation).to_matrix4x4();
-            //mx.rotate_quaternion(bone.rotation);
-
-            bone.matrix = parent * mx;
+            if bone.is_changed {
+                let mut mx = Matrix4x4::new();
+                mx.translate_vec3(bone.position + bone.local_position);
+                mx *= (bone.rotation * bone.local_rotation).to_matrix4x4();
+                bone.matrix = parent * mx;
+                // bone.is_changed = false;
+            }
 
             let children = bone_list[start_index].children.clone();
             let matrix = bone_list[start_index].matrix;
@@ -350,6 +525,61 @@ impl MeshData {
         }
 
         do_x(start_index, &mut self.bone_list, Matrix4x4::new());
+    }
+
+    pub fn set_bone_rotation(&mut self, name: &str, q: Quaternion) {
+        let map = self.bone_name_to_id.as_ref().unwrap();
+        /*if map.contains_key(name) {
+            let id = ;
+        }*/
+        if let Some(id) = map.get(name) {
+            let bone = &mut self.bone_list[*id as usize];
+            bone.local_rotation = q;
+            bone.is_changed = true;
+        }
+    }
+
+    pub fn apply_animation(&mut self, animation_name: &str, delta: f32) {
+        let mut a = None;
+        for i in 0..self.animation_list.len() {
+            if self.animation_list[i].name == animation_name {
+                a = Some(&mut self.animation_list[i]);
+                break;
+            }
+        }
+
+        if a.is_none() {
+            return;
+        }
+
+        let animation = a.unwrap();
+        animation.tick(delta);
+
+        let map = self.bone_name_to_id.as_ref().unwrap();
+
+        for i in 0..animation.sequence_list.len() {
+            let s = &mut animation.sequence_list[i];
+            s.calculate_frames(animation.current_time);
+            let value = s.calculate_frame_value(animation.current_time);
+
+            // Translate
+            if s.kind == 1 {
+                if let Some(id) = map.get(&s.key) {
+                    let bone = &mut self.bone_list[*id as usize];
+                    bone.position = Vector3::from_vector4(value);
+                    bone.is_changed = true;
+                }
+            }
+
+            // Rotation
+            if s.kind == 2 {
+                if let Some(id) = map.get(&s.key) {
+                    let bone = &mut self.bone_list[*id as usize];
+                    bone.rotation = Quaternion::from_vector4(value);
+                    bone.is_changed = true;
+                }
+            }
+        }
     }
 
     /*pub fn set_bone_rotation(&mut self, name: &str, q: Quaternion) {

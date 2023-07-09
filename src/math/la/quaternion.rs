@@ -1,5 +1,6 @@
 use crate::math::la::matrix4::Matrix4x4;
 use crate::math::la::vector3::Vector3;
+use crate::math::la::vector4::Vector4;
 use std::{fmt, ops};
 
 #[derive(Copy, Clone, Default, Debug)]
@@ -98,13 +99,8 @@ impl ops::MulAssign<Quaternion> for Quaternion {
 
 #[allow(dead_code)]
 impl Quaternion {
-    pub const fn new() -> Quaternion {
-        Quaternion {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-        }
+    pub const fn new(x: f32, y: f32, z: f32, w: f32) -> Quaternion {
+        Quaternion { x, y, z, w }
     }
 
     pub const fn zero() -> Quaternion {
@@ -116,7 +112,7 @@ impl Quaternion {
         }
     }
 
-    pub fn identity() -> Quaternion {
+    pub const fn identity() -> Quaternion {
         Quaternion {
             x: 0.0,
             y: 0.0,
@@ -268,6 +264,41 @@ impl Quaternion {
         v.z = a.atan2(1.0 - 2.0 * (self.y * self.y + self.z * self.z));
 
         return v;
+    }
+
+    pub fn to_vector4(&self) -> Vector4 {
+        Vector4::new(self.x, self.y, self.z, self.w)
+    }
+
+    pub fn lerp(a: Quaternion, b: Quaternion, t: f32) -> Quaternion {
+        let mut result = Quaternion {
+            w: 0.0,
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        let t_inv = 1.0 - t;
+
+        // Linear interpolation for the quaternion components
+        result.w = a.w * t_inv + b.w * t;
+        result.x = a.x * t_inv + b.x * t;
+        result.y = a.y * t_inv + b.y * t;
+        result.z = a.z * t_inv + b.z * t;
+
+        // Normalize the resulting quaternion
+        let norm =
+            (result.w * result.w + result.x * result.x + result.y * result.y + result.z * result.z)
+                .sqrt();
+        result.w /= norm;
+        result.x /= norm;
+        result.y /= norm;
+        result.z /= norm;
+
+        result
+    }
+
+    pub fn from_vector4(v: Vector4) -> Quaternion {
+        Quaternion::new(v.x, v.y, v.z, v.w)
     }
 
     pub fn from_bytes(b: &[u8]) -> Quaternion {

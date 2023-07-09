@@ -289,10 +289,12 @@ impl Matrix4x4 {
     }
 
     pub fn rotate_quaternion(&mut self, q: Quaternion) {
-        let e = q.to_euler();
+        /*let e = q.to_euler();
         self.rotate_x(e.x);
         self.rotate_y(e.y);
-        self.rotate_z(e.z);
+        self.rotate_z(e.z);*/
+        let mx = q.to_matrix4x4();
+        *self *= mx;
     }
 
     pub fn rotate_x(&mut self, rad: f32) {
@@ -452,7 +454,7 @@ impl Matrix4x4 {
 
         let trace = sm11 + sm22 + sm33;
         let mut s = 0.0;
-        let mut out = Quaternion::new();
+        let mut out = Quaternion::identity();
 
         if trace > 0.0 {
             s = (trace + 1.0).sqrt() * 2.0;

@@ -7,6 +7,8 @@ use crate::math::la::vector3::Vector3;
 pub struct Bone {
     pub name: String,
     pub id: u32,
+    pub is_changed: bool,
+
     pub position: Vector3,
     pub rotation: Quaternion,
     pub local_rotation: Quaternion,
@@ -25,10 +27,12 @@ impl Bone {
         Bone {
             name: String::new(),
             id: 0,
+            is_changed: false,
+
             position: Vector3::zero(),
-            rotation: Quaternion::new(),
+            rotation: Quaternion::identity(),
             local_position: Vector3::zero(),
-            local_rotation: Quaternion::new(),
+            local_rotation: Quaternion::identity(),
             local_scale: Vector3::one(),
             matrix: Matrix4x4::new(),
             inverse_bind_matrix: Matrix4x4::new(),

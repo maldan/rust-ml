@@ -1,4 +1,5 @@
 use crate::math::la::matrix4::Matrix4x4;
+use crate::math::la::vector3::Vector3;
 use std::fmt;
 use std::ops;
 
@@ -113,6 +114,14 @@ impl Vector4 {
         self
     }
 
+    pub fn lerp(a: Vector4, b: Vector4, t: f32) -> Vector4 {
+        let x = a.x + (b.x - a.x) * t;
+        let y = a.y + (b.y - a.y) * t;
+        let z = a.z + (b.z - a.z) * t;
+        let w = a.w + (b.w - a.w) * t;
+        Vector4 { x, y, z, w }
+    }
+
     pub fn from_bytes(b: &[u8]) -> Vector4 {
         Vector4 {
             x: f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
@@ -120,5 +129,9 @@ impl Vector4 {
             z: f32::from_le_bytes([b[8], b[9], b[10], b[11]]),
             w: f32::from_le_bytes([b[12], b[13], b[14], b[15]]),
         }
+    }
+
+    pub fn from_vector3(v: Vector3) -> Vector4 {
+        Vector4::new(v.x, v.y, v.z, 0.0)
     }
 }
